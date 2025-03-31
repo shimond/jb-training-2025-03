@@ -16,11 +16,22 @@ public class ProductsController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<ActionResult<List<Product>>> GetProducts()
+    public async Task<ActionResult<List<Product>>> GetProducts(string? q = null)
     {
-        var res =  await productRepository.GetProducts();
-        return Ok(res);
+        if (q is null)
+        {
+            var res = await productRepository.GetProducts();
+            return Ok(res);
+        }
+        else
+        {
+            var res = await productRepository.SearchProducts(q);
+            return res;
+        }
     }
+
+    
+    
 
     [HttpGet("{id}")]
     public async Task<ActionResult<Product>> GetProduct(int id)

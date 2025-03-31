@@ -1,0 +1,7 @@
+<div>
+    <h2>Search a product :)</h2>
+        <div>
+            <input type="search" [formControl]="searchControl"/>
+        </div>
+    <app-product-list [products]="productsFromServer()"></app-product-list>
+</div>

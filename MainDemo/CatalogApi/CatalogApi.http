@@ -1,0 +1,25 @@
+@CatalogApi_HostAddress = https://localhost:7147
+
+GET {{CatalogApi_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
+
+POST {{CatalogApi_HostAddress}}/api/Products
+
+###
+
+POST {{CatalogApi_HostAddress}}/api/Products
+Content-Type: application/json
+Accept:application/json
+
+{
+  "name":"bisli",
+  "price":12.6,
+  "description":"the bisli wow description"
+}
+###
+
+GET {{CatalogApi_HostAddress}}/api/products
+
+###

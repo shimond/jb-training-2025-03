@@ -10,7 +10,6 @@ const shoppingCart = {
             currency: 'USD'
         }
     },
-    
     // Method to add item with validation
     addItem(product, quantity = 1) {
         if (!product.id || !product.price || !product.name) {

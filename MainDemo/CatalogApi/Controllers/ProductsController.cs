@@ -8,6 +8,10 @@ namespace CatalogApi.Controllers;
 [ApiController]
 public class ProductsController : ControllerBase
 {
+
+    // support: update, delete
+    // implement IProductRepository  again with EF
+    // try to use config file to select which implementation ("DataBaseMode": "EF|ADO")
     private readonly IProductRepository productRepository;
 
     public ProductsController(IProductRepository productRepository)
@@ -29,9 +33,6 @@ public class ProductsController : ControllerBase
             return res;
         }
     }
-
-    
-    
 
     [HttpGet("{id}")]
     public async Task<ActionResult<Product>> GetProduct(int id)

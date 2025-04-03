@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Advanced Product Management System</title>
+    <link rel="stylesheet" href="https://code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
+    <style>
+        .product-grid {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        .product-grid th, .product-grid td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        .product-grid th {
+            background-color: #f4f4f4;
+            cursor: pointer;
+        }
+        .product-grid th:hover {
+            background-color: #e0e0e0;
+        }
+        .sort-icon::after {
+            content: '↕';
+            margin-left: 5px;
+        }
+        .sort-asc::after {
+            content: '↑';
+        }
+        .sort-desc::after {
+            content: '↓';
+        }
+        .product-grid tr:hover {
+            background-color: #f5f5f5;
+        }
+        .selected {
+            background-color: #e0e0e0 !important;
+        }
+        .action-buttons {
+            margin: 10px 0;
+            display: flex;
+            gap: 10px;
+        }
+        .checkbox-column {
+            width: 30px;
+        }
+        .error-message {
+            color: red;
+            margin: 10px 0;
+            display: none;
+        }
+        .success-message {
+            color: green;
+            margin: 10px 0;
+            display: none;
+        }
+        .filters {
+            margin: 20px 0;
+            padding: 15px;
+            background-color: #f8f8f8;
+            border-radius: 5px;
+        }
+        .pagination {
+            margin: 20px 0;
+            display: flex;
+            gap: 5px;
+            justify-content: center;
+        }
+        .pagination button {
+            padding: 5px 10px;
+            cursor: pointer;
+        }
+        .pagination button.active {
+            background-color: #007bff;
+            color: white;
+            border: none;
+        }
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255,255,255,0.8);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        .undo-action {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: #333;
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            display: none;
+        }
+        .comment-history {
+            max-height: 200px;
+            overflow-y: auto;
+            margin-bottom: 10px;
+        }
+        .comment-item {
+            padding: 5px;
+            border-bottom: 1px solid #eee;
+        }
+        .batch-actions {
+            display: none;
+            margin-top: 10px;
+            padding: 10px;
+            background-color: #f0f0f0;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Advanced Product Management System</h1>
+        
+        <div class="filters">
+            <h3>Filters</h3>
+            <div>
+                <label>Price Range:</label>
+                <div id="priceSlider"></div>
+                <span id="priceRange"></span>
+            </div>
+            <div>
+                <label>Category:</label>
+                <select id="categoryFilter">
+                    <option value="">All</option>
+                </select>
+            </div>
+            <div>
+                <label>Search:</label>
+                <input type="text" id="searchInput" placeholder="Search products...">
+            </div>
+        </div>
+
+        <div class="action-buttons">
+            <button id="deleteSelected">Delete Selected</button>
+            <button id="exportSelected">Export Selected</button>
+            <button id="bulkEdit">Bulk Edit</button>
+        </div>
+
+        <div class="batch-actions">
+            <h4>Bulk Edit Options</h4>
+            <label>
+                Category:
+                <select id="bulkCategory">
+                    <option value="">No Change</option>
+                </select>
+            </label>
+            <label>
+                Price Adjustment:
+                <input type="number" id="bulkPriceAdjustment" placeholder="Percentage">%
+            </label>
+            <button id="applyBulkEdit">Apply Changes</button>
+        </div>
+
+        <div id="errorMessage" class="error-message"></div>
+        <div id="successMessage" class="success-message"></div>
+
+        <table class="product-grid">
+            <thead>
+                <tr>
+                    <th class="checkbox-column"><input type="checkbox" id="selectAll"></th>
+                    <th data-sort="id" class="sortable">ID</th>
+                    <th data-sort="name" class="sortable">Name</th>
+                    <th data-sort="price" class="sortable">Price</th>
+                    <th data-sort="category" class="sortable">Category</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="productTableBody">
+            </tbody>
+        </table>
+
+        <div class="pagination" id="pagination"></div>
+    </div>
+
+    <!-- Comment Dialog -->
+    <div id="commentDialog" title="Product Comments" style="display:none;">
+        <div class="comment-history" id="commentHistory"></div>
+        <form id="commentForm">
+            <div>
+                <label for="commentText">New Comment:</label><br>
+                <textarea id="commentText" rows="4" cols="50"></textarea>
+            </div>
+        </form>
+    </div>
+
+    <!-- Edit Dialog -->
+    <div id="editDialog" title="Edit Product" style="display:none;">
+        <form id="editForm">
+            <div>
+                <label for="editName">Name:</label>
+                <input type="text" id="editName" required>
+            </div>
+            <div>
+                <label for="editPrice">Price:</label>
+                <input type="number" id="editPrice" step="0.01" required>
+            </div>
+            <div>
+                <label for="editCategory">Category:</label>
+                <select id="editCategory" required></select>
+            </div>
+        </form>
+    </div>
+
+    <div class="loading-overlay">
+        <div class="spinner">Loading...</div>
+    </div>
+
+    <div class="undo-action">
+        <span id="undoMessage"></span>
+        <button id="undoButton">Undo</button>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
+    <script>
+        $(document).ready(function() {
+            // Global variables
+            let products = [];
+            let filteredProducts = [];
+            let deletedProducts = [];
+            let currentPage = 1;
+            const itemsPerPage = 10;
+            let currentSort = { field: 'id', direction: 'asc' };
+            let priceRange = { min: 0, max: 1000 };
+            const API_URL = 'http://shimondahan.com/api/products';
+
+            // Initialize UI components
+            initializeDialogs();
+            initializeFilters();
+            initializeSorting();
+            initializeUndoSystem();
+
+            // Load initial data
+            loadProducts();
+
+            // Event Handlers
+            $("#selectAll").on("click", handleSelectAll);
+            $("#deleteSelected").on("click", handleDeleteSelected);
+            $("#exportSelected").on("click", handleExport);
+            $("#bulkEdit").on("click", toggleBulkEditMode);
+            $("#applyBulkEdit").on("click", applyBulkEdit);
+            $("#searchInput").on("input", debounce(handleSearch, 300));
+
+            // Initialize Dialogs
+            function initializeDialogs() {
+                $("#commentDialog").dialog({
+                    autoOpen: false,
+                    modal: true,
+                    width: 600,
+                    buttons: {
+                        "Save Comment": saveComment,
+                        Cancel: function() { $(this).dialog("close"); }
+                    }
+                });
+
+                $("#editDialog").dialog({
+                    autoOpen: false,
+                    modal: true,
+                    width: 400,
+                    buttons: {
+                        "Save": saveProductEdit,
+                        Cancel: function() { $(this).dialog("close"); }
+                    }
+                });
+            }
+
+            // Initialize Filters
+            function initializeFilters() {
+                $("#priceSlider").slider({
+                    range: true,
+                    min: 0,
+                    max: 1000,
+                    values: [0, 1000],
+                    slide: function(event, ui) {
+                        priceRange.min = ui.values[0];
+                        priceRange.max = ui.values[1];
+                        $("#priceRange").text(`$${ui.values[0]} - $${ui.values[1]}`);
+                        applyFilters();
+                    }
+                });
+
+                // Initialize category filter
+                $.ajax({
+                    url: `${API_URL}/categories`,
+                    success: function(categories) {
+                        const select = $("#categoryFilter, #editCategory, #bulkCategory");
+                        categories.forEach(category => {
+                            select.append(`<option value="${category}">${category}</option>`);
+                        });
+                    }
+                });
+            }
+
+            // Initialize Sorting
+            function initializeSorting() {
+                $(".sortable").on("click", function() {
+                    const field = $(this).data("sort");
+                    if (currentSort.field === field) {
+                        currentSort.direction = currentSort.direction === 'asc' ? 'desc' : 'asc';
+                    } else {
+                        currentSort.field = field;
+                        currentSort.direction = 'asc';
+                    }
+                    
+                    updateSortIndicators();
+                    applyFilters();
+                });
+            }
+
+            // Initialize Undo System
+            function initializeUndoSystem() {
+                let undoTimeout;
+                window.showUndo = function(message, undoCallback) {
+                    clearTimeout(undoTimeout);
+                    $("#undoMessage").text(message);
+                    $(".undo-action").show();
+                    
+                    $("#undoButton").off("click").on("click", function() {
+                        undoCallback();
+                        $(".undo-action").hide();
+                    });
+
+                    undoTimeout = setTimeout(() => {
+                        $(".undo-action").hide();
+                    }, 5000);
+                };
+            }
+
+            // Load Products
+            function loadProducts() {
+                showLoading();
+                $.ajax({
+                    url: API_URL,
+                    method: 'GET',
+                    success: function(data) {
+                        products = data;
+                        applyFilters();
+                        hideLoading();
+                    },
+                    error: handleError
+                });
+            }
+
+            // Display Products
+            function displayProducts() {
+                const tbody = $("#productTableBody");
+                tbody.empty();
+
+                const startIndex = (currentPage - 1) * itemsPerPage;
+                const endIndex = startIndex + itemsPerPage;
+                const displayedProducts = filteredProducts.slice(startIndex, endIndex);
+
+                displayedProducts.forEach(function(product) {
+                    const row = createProductRow(product);
+                    tbody.append(row);
+                });
+
+                updatePagination();
+                attachEventHandlers();
+            }
+
+            // Create Product Row
+            function createProductRow(product) {
+                return $("<tr>").append(
+                    $("<td>").append(
+                        $("<input>")
+                            .attr("type", "checkbox")
+                            .addClass("product-checkbox")
+                            .data("product-id", product.id)
+                    ),
+                    $("<td>").text(product.id),
+                    $("<td>").text(product.name),
+                    $("<td>").text('$' + product.price.toFixed(2)),
+                    $("<td>").text(product.category),
+                    $("<td>").append(
+                        $("<button>")
+                            .text("Edit")
+                            .addClass("edit-btn")
+                            .data("product", product),
+                        $("<button>")
+                            .text("Comments")
+                            .addClass("comment-btn")
+                            .data("product", product)
+                    )
+                );
+            }
+
+            // Event Handlers
+            function attachEventHandlers() {
+                $(".product-checkbox").on("change", updateSelectedRows);
+                $(".comment-btn").on("click", function() {
+                    const product = $(this).data("product");
+                    openCommentDialog(product);
+                });
+                $(".edit-btn").on("click", function() {
+                    const product = $(this).data("product");
+                    openEditDialog(product);
+                });
+            }
+
+            // Handle Select All
+            function handleSelectAll() {
+                const isChecked = $(this).prop("checked");
+                $(".product-checkbox").prop("checked", isChecked);
+                updateSelectedRows();
+            }
+
+            // Handle Delete Selected
+            function handleDeleteSelected() {
+                const selectedIds = getSelectedIds();
+                if (selectedIds.length === 0) {
+                    showError("Please select at least one product");
+                    return;
+                }
+
+                if (confirm(`Delete ${selectedIds.length} product(s)?`)) {
+                    const deletedItems = products.filter(p => selectedIds.includes(p.id));
+                    products = products.filter(p => !selectedIds.includes(p.id));
+                    
+                    applyFilters();
+                    showSuccess(`${selectedIds.length} product(s) deleted`);
+                    
+                    showUndo(
+                        `Deleted ${selectedIds.length} product(s)`,
+                        () => {
+                            products.push(...deletedItems);
+                            applyFilters();
+                            showSuccess("Deletion undone");
+                        }
+                    );
+                }
+            }
+
+            // Handle Export
+            function handleExport() {
+                const selectedIds = getSelectedIds();
+                if (selectedIds.length === 0) {
+                    showError("Please select products to export");
+                    return;
+                }
+
+                const selectedProducts = products.filter(p => selectedIds.includes(p.id));
+                const csv = convertToCSV(selectedProducts);
+                downloadCSV(csv, 'products_export.csv');
+            }
+
+            // Bulk Edit Functions
+            function toggleBulkEditMode() {
+                $(".batch-actions").toggle();
+            }
+
+            function applyBulkEdit() {
+                const selectedIds = getSelectedIds();
+                if (selectedIds.length === 0) {
+                    showError("Please select products to edit");
+                    return;
+                }
+
+                const category = $("#bulkCategory").val();
+                const priceAdjustment = parseFloat($("#bulkPriceAdjustment").val()) || 0;
+
+                const oldProducts = [...products];
+                products = products.map(product => {
+                    if (selectedIds.includes(product.id)) {
+                        return {
+                            ...product,
+                            category: category || product.category,
+                            price: product.price * (1 + priceAdjustment / 100)
+                        };
+                    }
+                    return product;
+                });
+
+                applyFilters();
+                showSuccess(`Updated ${selectedIds.length} product(s)`);
+                
+                showUndo(
+                    `Updated ${selectedIds.length} product(s)`,
+                    () => {
+                        products = oldProducts;
+                        applyFilters();
+                        showSuccess("Changes undone");
+                    }
+                );
+            }
+
+            // Filter and Sort Functions
+            function applyFilters() {
+                filteredProducts = products.filter(product => {
+                    const matchesSearch = !$("#searchInput").val() || 
+                        product.name.toLowerCase().includes($("#searchInput").val().toLowerCase());
+                    const matchesCategory = !$("#categoryFilter").val() || 
+                        product.category === $("#categoryFilter").val();
+                    const matchesPrice = product.price >= priceRange.min && 
+                        product.price <= priceRange.max;
+
+                    return matchesSearch && matchesCategory && matchesPrice;
+                });
+
+                // Apply sorting
+                filteredProducts.sort((a, b) => {
+                    const factor = currentSort.direction === 'asc' ? 1 : -1;
+                    if (typeof a[currentSort.field] === 'string') {
+                        return a[currentSort.field].localeCompare(b[currentSort.field]) * factor;
+                    }
+                    return (a[currentSort.field] - b[currentSort.field]) * factor;
+                });
+
+                currentPage = 1;
+                displayProducts();
+            }
+
+            // Utility Functions
+            function showLoading() {
+                $(".loading-overlay").css("display", "flex");
+            }
+
+            function hideLoading() {
+                $(".loading-overlay").hide();
+            }
+
+            function showError(message) {
+                Toastify({
+                    text: message,
+                    duration: 3000,
+                    close: true,
+                    backgroundColor: "#ff0000"
+                }).showToast();
+            }
+
+            function showSuccess(message) {
+                Toastify({
+                    text: message,
+                    duration: 3000,
+                    close: true,
+                    backgroundColor: "#4CAF50"
+                }).showToast();
+            }
+
+            function debounce(func, wait) {
+                let timeout;
+                return function executedFunction(...args) {
+                    const later = () => {
+                        clearTimeout(timeout);
+                        func(...args);
+                    };
+                    clearTimeout(timeout);
+                    timeout = setTimeout(later, wait);
+                };
+            }
+
+            function getSelectedIds() {
+                const ids = [];
+                $(".product-checkbox:checked").each(function() {
+                    ids.push($(this).data("product-id"));
+                });
+                return ids;
+            }
+
+            function convertToCSV(products) {
+                const headers = ['ID', 'Name', 'Price', 'Category'];
+                const rows = products.map(p => [p.id, p.name, p.price, p.category]);
+                return [headers, ...rows].map(row => row.join(',')).join('\n');
+            }
+
+            function downloadCSV(csv, filename) {
+                const blob = new Blob([csv], { type: 'text/csv' });
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.setAttribute('hidden', '');
+                a.setAttribute('href', url);
+                a.setAttribute('download', filename);
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+            }
+
+            function updatePagination() {
+                const totalPages = Math.ceil(filteredProducts.length / itemsPerPage);
+                const pagination = $("#pagination");
+                pagination.empty();
+
+                for (let i = 1; i <= totalPages; i++) {
+                    pagination.append(
+                        $("<button>")
+                            .text(i)
+                            .toggleClass('active', i === currentPage)
+                            .on('click', () => {
+                                currentPage = i;
+                                displayProducts();
+                            })
+                    );
+                }
+            }
+
+            function updateSortIndicators() {
+                $(".sortable").removeClass("sort-asc sort-desc");
+                $(`.sortable[data-sort="${currentSort.field}"]`)
+                    .addClass(`sort-${currentSort.direction}`);
+            }
+        });
+    </script>
+</body>
+</html>
